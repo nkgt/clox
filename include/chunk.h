@@ -1,6 +1,7 @@
 #ifndef CLOX_CHUNK_H
 #define CLOX_CHUNK_H
 
+#include <stddef.h>
 #include <stdint.h>
 
 #include "value.h"
@@ -11,8 +12,8 @@ typedef enum {
 } OpCode;
 
 typedef struct {
-    int capacity;
-    int count;
+    size_t capacity;
+    size_t count;
     uint8_t* code;
     int* lines;
     ValueArray constants;
@@ -21,6 +22,6 @@ typedef struct {
 void init_chunk(Chunk* chunk);
 void free_chunk(Chunk* chunk);
 void write_chunk(Chunk* chunk, uint8_t byte, int line);
-int add_constant(Chunk* chunk, Value value);
+size_t add_constant(Chunk* chunk, Value value);
 
 #endif //CLOX_CHUNK_H

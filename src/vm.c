@@ -5,7 +5,7 @@
 
 VM vm;
 
-static interpret_result run() {
+static interpret_result run(void) {
     for (;;) {
 #ifdef DEBUG_TRACE_EXECUTION
         disassemble_instruction(vm.chunk, (int)(vm.ip - vm.chunk->code));
@@ -24,8 +24,8 @@ static interpret_result run() {
     }
 }
 
-void init_vm() {}
-void free_vm() {}
+void init_vm(void) {}
+void free_vm(void) {}
 
 interpret_result interpret(Chunk* chunk) {
     vm.chunk = chunk;

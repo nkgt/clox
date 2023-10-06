@@ -19,7 +19,7 @@ void free_chunk(Chunk* chunk) {
 
 void write_chunk(Chunk* chunk, uint8_t byte, int line) {
     if(chunk->capacity < chunk->count + 1) {
-        int old_capacity = chunk->capacity;
+        size_t old_capacity = chunk->capacity;
         chunk->capacity = GROW_CAPACITY(old_capacity);
 
         chunk->code = GROW_ARRAY(
@@ -42,7 +42,7 @@ void write_chunk(Chunk* chunk, uint8_t byte, int line) {
     ++chunk->count;
 }
 
-int add_constant(Chunk* chunk, Value value) {
+size_t add_constant(Chunk* chunk, Value value) {
     write_value_array(&chunk->constants, value);
     return chunk->constants.count - 1;
 }

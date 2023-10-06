@@ -14,8 +14,8 @@ typedef enum {
     INTERPRET_RUNTIME_ERROR
 } interpret_result;
 
-void init_vm();
-void free_vm();
+void init_vm(void);
+void free_vm(void);
 interpret_result interpret(Chunk* chunk);
 
 #endif // CLOX_VM_H
