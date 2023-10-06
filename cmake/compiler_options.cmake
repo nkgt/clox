@@ -88,5 +88,6 @@ function(set_compiler_flags_linux target)
             -Wlogical-op
             -Wnull-dereference
         >
+        -march=native
     )
 endfunction()
