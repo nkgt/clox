@@ -11,6 +11,7 @@ set(CLOX_SOURCES
     src/main.c
     src/memory.c
     src/value.c
+    src/vm.c
 )
 
 set(CLOX_HEADERS
@@ -18,6 +19,7 @@ set(CLOX_HEADERS
     include/debug.h
     include/memory.h
     include/value.h
+    include/vm.h
 )
 
 add_executable(clox ${CLOX_SOURCES} ${CLOX_HEADERS})
