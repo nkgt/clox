@@ -7,17 +7,21 @@ set(CMAKE_C_STANDARD 11)
 
 set(CLOX_SOURCES
     src/chunk.c
+    src/compiler.c
     src/debug.c
     src/main.c
     src/memory.c
+    src/scanner.c
     src/value.c
     src/vm.c
 )
 
 set(CLOX_HEADERS
     include/chunk.h
+    include/compiler.h
     include/debug.h
     include/memory.h
+    include/scanner.h
     include/value.h
     include/vm.h
 )
