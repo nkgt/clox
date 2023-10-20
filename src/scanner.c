@@ -115,7 +115,7 @@ static TokenType check_keyword(int start,
                                const char* rest,
                                TokenType type) {
     bool length_match = scanner.current - scanner.start == start + length;
-    bool content_match = memcmp(scanner.start, rest, (size_t)length) == 0;
+    bool content_match = memcmp(scanner.start + start, rest, (size_t)length) == 0;
 
     if(length_match && content_match) {
         return type;

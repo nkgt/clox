@@ -7,6 +7,8 @@
 #include "debug.h"
 #include "scanner.h"
 
+#define BYTES(...) ((uint8_t[]){__VA_ARGS__}), sizeof((uint8_t[]){__VA_ARGS__}) / sizeof(uint8_t)
+
 typedef struct {
     Token current;
     Token previous;
@@ -44,6 +46,7 @@ static void grouping(void);
 static void binary(void);
 static void number(void);
 static void unary(void);
+static void literal(void);
 
 ParseRule rules[] = {
     [TOKEN_LEFT_PAREN]    = {grouping, NULL,   PREC_NONE},
@@ -57,31 +60,31 @@ ParseRule rules[] = {
     [TOKEN_SEMICOLON]     = {NULL,     NULL,   PREC_NONE},
     [TOKEN_SLASH]         = {NULL,     binary, PREC_FACTOR},
     [TOKEN_STAR]          = {NULL,     binary, PREC_FACTOR},
-    [TOKEN_BANG]          = {NULL,     NULL,   PREC_NONE},
-    [TOKEN_BANG_EQUAL]    = {NULL,     NULL,   PREC_NONE},
+    [TOKEN_BANG]          = {unary,    NULL,   PREC_NONE},
+    [TOKEN_BANG_EQUAL]    = {NULL,     binary, PREC_EQUALITY},
     [TOKEN_EQUAL]         = {NULL,     NULL,   PREC_NONE},
-    [TOKEN_EQUAL_EQUAL]   = {NULL,     NULL,   PREC_NONE},
-    [TOKEN_GREATER]       = {NULL,     NULL,   PREC_NONE},
-    [TOKEN_GREATER_EQUAL] = {NULL,     NULL,   PREC_NONE},
-    [TOKEN_LESS]          = {NULL,     NULL,   PREC_NONE},
-    [TOKEN_LESS_EQUAL]    = {NULL,     NULL,   PREC_NONE},
+    [TOKEN_EQUAL_EQUAL]   = {NULL,     binary, PREC_EQUALITY},
+    [TOKEN_GREATER]       = {NULL,     binary, PREC_COMPARISON},
+    [TOKEN_GREATER_EQUAL] = {NULL,     binary, PREC_COMPARISON},
+    [TOKEN_LESS]          = {NULL,     binary, PREC_COMPARISON},
+    [TOKEN_LESS_EQUAL]    = {NULL,     binary, PREC_COMPARISON},
     [TOKEN_IDENTIFIER]    = {NULL,     NULL,   PREC_NONE},
     [TOKEN_STRING]        = {NULL,     NULL,   PREC_NONE},
     [TOKEN_NUMBER]        = {number,   NULL,   PREC_NONE},
     [TOKEN_AND]           = {NULL,     NULL,   PREC_NONE},
     [TOKEN_CLASS]         = {NULL,     NULL,   PREC_NONE},
     [TOKEN_ELSE]          = {NULL,     NULL,   PREC_NONE},
-    [TOKEN_FALSE]         = {NULL,     NULL,   PREC_NONE},
+    [TOKEN_FALSE]         = {literal,  NULL,   PREC_NONE},
     [TOKEN_FOR]           = {NULL,     NULL,   PREC_NONE},
     [TOKEN_FUN]           = {NULL,     NULL,   PREC_NONE},
     [TOKEN_IF]            = {NULL,     NULL,   PREC_NONE},
-    [TOKEN_NIL]           = {NULL,     NULL,   PREC_NONE},
+    [TOKEN_NIL]           = {literal,  NULL,   PREC_NONE},
     [TOKEN_OR]            = {NULL,     NULL,   PREC_NONE},
     [TOKEN_PRINT]         = {NULL,     NULL,   PREC_NONE},
     [TOKEN_RETURN]        = {NULL,     NULL,   PREC_NONE},
     [TOKEN_SUPER]         = {NULL,     NULL,   PREC_NONE},
     [TOKEN_THIS]          = {NULL,     NULL,   PREC_NONE},
-    [TOKEN_TRUE]          = {NULL,     NULL,   PREC_NONE},
+    [TOKEN_TRUE]          = {literal,  NULL,   PREC_NONE},
     [TOKEN_VAR]           = {NULL,     NULL,   PREC_NONE},
     [TOKEN_WHILE]         = {NULL,     NULL,   PREC_NONE},
     [TOKEN_ERROR]         = {NULL,     NULL,   PREC_NONE},
@@ -134,8 +137,10 @@ static void consume(TokenType type, const char* message) {
     error_at_current(message);
 }
 
-static void emit_byte(uint8_t byte) {
-    write_chunk(current_chunk(), byte, parser.previous.line);
+static inline void emit_bytes(uint8_t *bytes, int size) {
+    for(int i = 0; i < size; ++i) {
+        write_chunk(current_chunk(), bytes[i], parser.previous.line);
+    }
 }
 
 static void parse_precedence(Precedence precedence) {
@@ -171,10 +176,25 @@ static void binary(void) {
     parse_precedence((Precedence)(rule.precedence + 1));
 
     switch (operator_type) {
-        case TOKEN_PLUS:  emit_byte(OP_ADD); break;
-        case TOKEN_MINUS: emit_byte(OP_SUBTRACT); break;
-        case TOKEN_STAR:  emit_byte(OP_MULTIPLY); break;
-        case TOKEN_SLASH: emit_byte(OP_DIVIDE); break;
+        case TOKEN_BANG_EQUAL:    emit_bytes(BYTES(OP_EQUAL, OP_NOT));   break;
+        case TOKEN_EQUAL_EQUAL:   emit_bytes(BYTES(OP_EQUAL));           break;
+        case TOKEN_GREATER:       emit_bytes(BYTES(OP_GREATER));         break;
+        case TOKEN_GREATER_EQUAL: emit_bytes(BYTES(OP_LESS, OP_NOT));    break;
+        case TOKEN_LESS:          emit_bytes(BYTES(OP_LESS));            break;
+        case TOKEN_LESS_EQUAL:    emit_bytes(BYTES(OP_GREATER, OP_NOT)); break;
+        case TOKEN_PLUS:          emit_bytes(BYTES(OP_ADD));             break;
+        case TOKEN_MINUS:         emit_bytes(BYTES(OP_SUBTRACT));        break;
+        case TOKEN_STAR:          emit_bytes(BYTES(OP_MULTIPLY));        break;
+        case TOKEN_SLASH:         emit_bytes(BYTES(OP_DIVIDE));          break;
+        default: return;
+    }
+}
+
+static void literal(void) {
+    switch (parser.previous.type) {
+        case TOKEN_FALSE: emit_bytes(BYTES(OP_FALSE)); return;
+        case TOKEN_NIL:   emit_bytes(BYTES(OP_NIL));   return;
+        case TOKEN_TRUE:  emit_bytes(BYTES(OP_TRUE));  return;
         default: return;
     }
 }
@@ -191,9 +211,11 @@ static uint8_t make_constant(Value value) {
 }
 
 static void number(void) {
-    double value = strtod(parser.previous.start, NULL);
-    emit_byte(OP_CONSTANT);
-    emit_byte(make_constant(value)); 
+    double num_value = strtod(parser.previous.start, NULL);
+    Value value = {VAL_NUMBER, {.number = num_value}};
+
+    emit_bytes(BYTES(OP_CONSTANT));
+    emit_bytes(BYTES(make_constant(value))); 
 }
 
 static void unary(void) {
@@ -202,7 +224,8 @@ static void unary(void) {
     parse_precedence(PREC_UNARY);
 
     switch(operator_type) {
-        case TOKEN_MINUS: emit_byte(OP_NEGATE); break;
+        case TOKEN_BANG:  emit_bytes(BYTES(OP_NOT));    break;
+        case TOKEN_MINUS: emit_bytes(BYTES(OP_NEGATE)); break;
         default: return;
     }
 }
@@ -219,7 +242,7 @@ bool compile(const char* source, Chunk* chunk) {
     expression();
     consume(TOKEN_EOF, "Expected end of expression.");
 
-    emit_byte(OP_RETURN);
+    emit_bytes(BYTES(OP_RETURN));
 
 #ifdef DEBUG_PRINT_CODE
     if(!parser.had_error) {
